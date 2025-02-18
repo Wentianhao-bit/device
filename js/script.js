@@ -85,7 +85,9 @@ addDeviceBtn.addEventListener('click', async () => {
     const deviceData = {
         name: document.getElementById('newDeviceName').value.trim(),
         type: document.getElementById('newDeviceType').value,
-        quantity: parseInt(document.getElementById('newDeviceQuantity').value) || 0
+        quantity: parseInt(document.getElementById('newDeviceQuantity').value) || 0,
+        outQuantity: 0, // 初始出库数量为0
+        borrower: '' // 初始借用人为空
     };
 
     if (!deviceData.name || deviceData.quantity <= 0) {
@@ -108,6 +110,30 @@ addDeviceBtn.addEventListener('click', async () => {
         alert('添加设备失败，请重试！');
     }
 });
+
+// 加载设备列表（含出库状态和借用人）
+function loadDeviceList() {
+    database.ref('devices').on('value', (snapshot) => {
+        const deviceListBody = document.getElementById('deviceListBody');
+        deviceListBody.innerHTML = '';
+        const devices = snapshot.val() || {};
+
+        Object.entries(devices).forEach(([key, value]) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${value.name}</td>
+                <td>${value.type}</td>
+                <td>${value.quantity}</td>
+                <td>${value.outQuantity || 0}</td>
+                <td>${value.borrower || '无'}</td>
+                <td class="${value.outQuantity > 0 ? 'status-out' : 'status-in'}">
+                    ${value.outQuantity > 0 ? '出库中' : '在库'}
+                </td>
+            `;
+            deviceListBody.appendChild(row);
+        });
+    });
+}
 
 // 加载记录（含删除功能）
 function loadRecords(dateFilter = '') {
@@ -160,4 +186,5 @@ window.deleteRecord = async (key) => {
 // 初始化加载
 loadDevicesToSelect();
 loadRecords();
+loadDeviceList();
 document.getElementById('dateFilter').addEventListener('change', (e) => loadRecords(e.target.value));
