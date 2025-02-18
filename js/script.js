@@ -96,12 +96,15 @@ const firebaseConfig = {
                         await database.ref(`devices/${key}`).update(updatedDevice);
                     } else if (recordData.operationType === '入库') {
                         // 入库：减少出库数量，移除当前借用人
+                        const borrowers = currentDevice.borrowers || [];
+                        const updatedBorrowers = borrowers.filter(borrower => borrower !== recordData.personName);
                         const updatedDevice = {
                             ...currentDevice,
                             outQuantity: Math.max((currentDevice.outQuantity || 0) - 1, 0),
-                            borrowers: (currentDevice.borrowers || []).filter(borrower => borrower !== recordData.personName)
+                            borrowers: updatedBorrowers
                         };
                         await database.ref(`devices/${key}`).update(updatedDevice);
+                        console.log('入库后借用人信息:', updatedBorrowers); // 调试信息
                     }
                 }
 
