@@ -25,3 +25,19 @@ body {
     cursor: pointer;
     color: #dc3545;
 }
+
+.status-out {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.status-in {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.quantity-btn {
+    margin: 0 2px;
+    padding: 2px 6px;
+    font-size: 12px;
+}
