@@ -94,17 +94,18 @@ const firebaseConfig = {
                             borrowers: [...(currentDevice.borrowers || []), recordData.personName]
                         };
                         await database.ref(`devices/${key}`).update(updatedDevice);
+                        console.log('出库后借用人信息:', updatedDevice.borrowers);
                     } else if (recordData.operationType === '入库') {
                         // 入库：减少出库数量，移除当前借用人
-                        const borrowers = currentDevice.borrowers || [];
-                        const updatedBorrowers = borrowers.filter(borrower => borrower !== recordData.personName);
+                        const currentBorrowers = currentDevice.borrowers || [];
+                        const newBorrowers = currentBorrowers.filter(borrower => borrower !== recordData.personName);
                         const updatedDevice = {
                             ...currentDevice,
                             outQuantity: Math.max((currentDevice.outQuantity || 0) - 1, 0),
-                            borrowers: updatedBorrowers
+                            borrowers: newBorrowers
                         };
                         await database.ref(`devices/${key}`).update(updatedDevice);
-                        console.log('入库后借用人信息:', updatedBorrowers); // 调试信息
+                        console.log('入库后借用人信息:', newBorrowers);
                     }
                 }
 
@@ -325,6 +326,6 @@ const firebaseConfig = {
             // 日期筛选监听
             document.getElementById('dateFilter').addEventListener('change', (e) => {
                 currentPage = 1;
-        loadRecords(e.target.value);
+                loadRecords(e.target.value);
     });
 });
