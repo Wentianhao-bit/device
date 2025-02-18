@@ -121,8 +121,8 @@ addDeviceBtn.addEventListener('click', async () => {
         name: document.getElementById('newDeviceName').value.trim(),
         type: document.getElementById('newDeviceType').value,
         quantity: parseInt(document.getElementById('newDeviceQuantity').value) || 0,
-        outQuantity: 0, // 初始出库数量为0
-        borrowers: [] // 初始借用人为空
+        outQuantity: 0,
+        borrowers: []
     };
 
     if (!deviceData.name || deviceData.quantity <= 0) {
@@ -146,15 +146,18 @@ addDeviceBtn.addEventListener('click', async () => {
     }
 });
 
-// 加载设备列表（含出库状态和借用人）
+// 加载设备列表（按类型排序+显示所有借用人）
 function loadDeviceList() {
     database.ref('devices').on('value', (snapshot) => {
         const deviceListBody = document.getElementById('deviceListBody');
         deviceListBody.innerHTML = '';
         const devices = snapshot.val() || {};
 
-        // 按设备类型排序
-        const sortedDevices = Object.entries(devices).sort((a, b) => a[1].type.localeCompare(b[1].type));
+        // 按类型排序（生产设备 → 检测仪器 → 办公设备）
+        const sortedDevices = Object.entries(devices).sort((a, b) => {
+            const typeOrder = { '生产设备': 1, '检测仪器': 2, '办公设备': 3 };
+            return typeOrder[a[1].type] - typeOrder[b[1].type];
+        });
 
         sortedDevices.forEach(([key, value]) => {
             const row = document.createElement('tr');
@@ -163,16 +166,19 @@ function loadDeviceList() {
                 <td>${value.type}</td>
                 <td>
                     ${value.quantity}
-                    <button class="btn btn-sm btn-success quantity-btn" onclick="updateDeviceQuantity('${key}', ${value.quantity + 1})">+</button>
-                    <button class="btn btn-sm btn-warning quantity-btn" onclick="updateDeviceQuantity('${key}', ${value.quantity - 1})">-</button>
+                    <button class="btn btn-sm btn-success quantity-btn" 
+                      onclick="handleQuantityUpdate('${key}', ${value.quantity + 1})">+</button>
+                    <button class="btn btn-sm btn-warning quantity-btn" 
+                      onclick="handleQuantityUpdate('${key}', ${value.quantity - 1})">-</button>
                 </td>
                 <td>${value.outQuantity || 0}</td>
-                <td>${value.borrowers ? value.borrowers.join(', ') : '无'}</td>
+                <td>${value.borrowers?.join(', ') || '无'}</td>
                 <td class="${value.outQuantity > 0 ? 'status-out' : 'status-in'}">
                     ${value.outQuantity > 0 ? '出库中' : '在库'}
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteDevice('${key}')">删除</button>
+                    <button class="btn btn-sm btn-danger" 
+                      onclick="handleDeviceDeletion('${key}')">删除</button>
                 </td>
             `;
             deviceListBody.appendChild(row);
@@ -180,11 +186,11 @@ function loadDeviceList() {
     });
 }
 
-// 更新设备数量（需密码验证）
-window.updateDeviceQuantity = async (key, newQuantity) => {
-    const password = prompt('请输入密码：');
+// 统一处理设备数量更新（含密码验证）
+window.handleQuantityUpdate = async (key, newQuantity) => {
+    const password = prompt('请输入操作密码：');
     if (password !== '000000') {
-        alert('密码错误！');
+        alert('密码错误！操作已取消');
         return;
     }
 
@@ -195,28 +201,28 @@ window.updateDeviceQuantity = async (key, newQuantity) => {
 
     try {
         await database.ref(`devices/${key}`).update({ quantity: newQuantity });
-        alert('设备数量更新成功！');
+        alert('数量更新成功！');
     } catch (error) {
         console.error('更新失败:', error);
-        alert('更新设备数量失败，请重试！');
+        alert('更新失败，请检查网络连接');
     }
 };
 
-// 删除设备（需密码验证）
-window.deleteDevice = async (key) => {
-    const password = prompt('请输入密码：');
+// 统一处理设备删除（含密码验证）
+window.handleDeviceDeletion = async (key) => {
+    const password = prompt('请输入操作密码：');
     if (password !== '000000') {
-        alert('密码错误！');
+        alert('密码错误！操作已取消');
         return;
     }
 
-    if (confirm('确定删除该设备吗？')) {
+    if (confirm('确定要永久删除该设备吗？')) {
         try {
             await database.ref(`devices/${key}`).remove();
-            alert('设备删除成功！');
+            alert('设备已删除');
         } catch (error) {
             console.error('删除失败:', error);
-            alert('删除设备失败，请重试！');
+            alert('删除失败，请重试');
         }
     }
 };
@@ -235,53 +241,61 @@ function loadRecords(dateFilter = '') {
     ref.on('value', (snapshot) => {
         const recordsBody = document.getElementById('recordsBody');
         recordsBody.innerHTML = '';
-        const records = snapshot.val() || {};
+        const allRecords = Object.entries(snapshot.val() || {});
 
-        // 将记录按时间戳排序
-        const sortedRecords = Object.entries(records).sort((a, b) => b[1].timestamp - a[1].timestamp);
+        // 按时间倒序排序
+        const sortedRecords = allRecords.sort((a, b) => b[1].timestamp - a[1].timestamp);
 
-        // 分页逻辑
+        // 分页处理
+        const totalPages = Math.ceil(sortedRecords.length / recordsPerPage);
         const startIndex = (currentPage - 1) * recordsPerPage;
         const endIndex = startIndex + recordsPerPage;
-        const paginatedRecords = sortedRecords.slice(startIndex, endIndex);
+        const pageRecords = sortedRecords.slice(startIndex, endIndex);
 
-        paginatedRecords.forEach(([key, value]) => {
+        // 渲染记录
+        pageRecords.forEach(([key, record]) => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${new Date(value.timestamp).toLocaleString()}</td>
-                <td>${value.deviceName}</td>
-                <td>${value.deviceType}</td>
-                <td class="${value.operationType === '入库' ? 'operation-in' : 'operation-out'}">${value.operationType}</td>
-                <td>${value.personName}</td>
-                <td><span class="delete-btn" onclick="deleteRecord('${key}')">🗑️ 删除</span></td>
+                <td>${new Date(record.timestamp).toLocaleString()}</td>
+                <td>${record.deviceName}</td>
+                <td>${record.deviceType}</td>
+                <td class="${record.operationType === '入库' ? 'operation-in' : 'operation-out'}">
+                    ${record.operationType}
+                </td>
+                <td>${record.personName}</td>
+                <td>
+                    <span class="delete-btn" onclick="handleRecordDeletion('${key}')">🗑️ 删除</span>
+                </td>
             `;
             recordsBody.appendChild(row);
         });
 
         // 更新分页按钮状态
-        prevPageBtn.disabled = currentPage === 1;
-        nextPageBtn.disabled = endIndex >= sortedRecords.length;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
     });
 }
 
-// 删除记录（需密码验证）
-window.deleteRecord = async (key) => {
-    const password = prompt('请输入密码：');
+// 处理记录删除（含密码验证）
+window.handleRecordDeletion = async (key) => {
+    const password = prompt('请输入操作密码：');
     if (password !== '000000') {
-        alert('密码错误！');
+        alert('密码错误！操作已取消');
         return;
     }
 
-    try {
-        await database.ref(`records/${key}`).remove();
-        alert('记录删除成功！');
-    } catch (error) {
-        console.error('删除失败:', error);
-        alert('删除记录失败，请重试！');
+    if (confirm('确定要删除这条记录吗？')) {
+        try {
+            await database.ref(`records/${key}`).remove();
+            alert('记录已删除');
+        } catch (error) {
+            console.error('删除失败:', error);
+            alert('删除失败，请重试');
+        }
     }
 };
 
-// 翻页功能
+// 分页控制
 prevPageBtn.addEventListener('click', () => {
     currentPage--;
     loadRecords(document.getElementById('dateFilter').value);
@@ -293,9 +307,14 @@ nextPageBtn.addEventListener('click', () => {
 });
 
 // 初始化加载
-loadDevicesToSelect();
-loadRecords();
-loadDeviceList();
-document.getElementById('dateFilter').addEventListener('change', (e) => {
-    currentPage = 1;
-    loadRecords(e.target
+document.addEventListener('DOMContentLoaded', () => {
+    loadDevicesToSelect();
+    loadRecords();
+    loadDeviceList();
+    
+    // 日期筛选监听
+    document.getElementById('dateFilter').addEventListener('change', (e) => {
+        currentPage = 1;
+        loadRecords(e.target.value);
+    });
+});
