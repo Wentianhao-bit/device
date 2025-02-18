@@ -18,6 +18,10 @@ const database = firebase.database();
 const recordForm = document.getElementById('recordForm');
 const dateFilter = document.getElementById('dateFilter');
 const recordsBody = document.getElementById('recordsBody');
+const deviceListBody = document.getElementById('deviceListBody');
+const addDeviceBtn = document.getElementById('addDeviceBtn');
+const newDeviceName = document.getElementById('newDeviceName');
+const newDeviceQuantity = document.getElementById('newDeviceQuantity');
 
 // 提交新记录
 recordForm.addEventListener('submit', async (e) => {
@@ -28,6 +32,7 @@ recordForm.addEventListener('submit', async (e) => {
         deviceType: document.getElementById('deviceType').value,
         operationType: document.getElementById('operationType').value,
         recordTime: document.getElementById('recordTime').value,
+        personName: document.getElementById('personName').value,
         timestamp: firebase.database.ServerValue.TIMESTAMP
     };
 
@@ -69,7 +74,7 @@ function loadRecords(dateFilter = '') {
                 <td class="${value.operationType === '入库' ? 'operation-in' : 'operation-out'}">
                     ${value.operationType}
                 </td>
-                <td>${value.operator || '系统记录'}</td>
+                <td>${value.personName}</td>
             `;
 
             recordsBody.appendChild(row);
@@ -77,10 +82,92 @@ function loadRecords(dateFilter = '') {
     });
 }
 
+// 添加设备
+addDeviceBtn.addEventListener('click', async () => {
+    const deviceName = newDeviceName.value.trim();
+    const quantity = parseInt(newDeviceQuantity.value);
+
+    if (!deviceName || isNaN(quantity) {
+        alert('请填写设备名称和数量！');
+        return;
+    }
+
+    try {
+        const snapshot = await database.ref('devices').orderByChild('name').equalTo(deviceName).once('value');
+        const existingDevice = snapshot.val();
+
+        if (existingDevice) {
+            const key = Object.keys(existingDevice)[0];
+            const newQuantity = existingDevice[key].quantity + quantity;
+            await database.ref(`devices/${key}`).update({ quantity: newQuantity });
+        } else {
+            await database.ref('devices').push({ name: deviceName, quantity: quantity });
+        }
+
+        newDeviceName.value = '';
+        newDeviceQuantity.value = '';
+    } catch (error) {
+        console.error('添加设备失败:', error);
+        alert('添加设备失败，请重试！');
+    }
+});
+
+// 实时加载设备列表
+function loadDeviceList() {
+    database.ref('devices').on('value', (snapshot) => {
+        deviceListBody.innerHTML = '';
+        const devices = snapshot.val() || {};
+
+        Object.entries(devices).forEach(([key, value]) => {
+            const row = document.createElement('tr');
+            
+            row.innerHTML = `
+                <td>${value.name}</td>
+                <td>${value.quantity}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteDevice('${key}')">删除</button>
+                    <button class="btn btn-sm btn-warning" onclick="updateDevice('${key}', ${value.quantity - 1})">-1</button>
+                    <button class="btn btn-sm btn-success" onclick="updateDevice('${key}', ${value.quantity + 1})">+1</button>
+                </td>
+            `;
+
+            deviceListBody.appendChild(row);
+        });
+    });
+}
+
+// 删除设备
+window.deleteDevice = async (key) => {
+    if (confirm('确定删除该设备吗？')) {
+        try {
+            await database.ref(`devices/${key}`).remove();
+        } catch (error) {
+            console.error('删除设备失败:', error);
+            alert('删除设备失败，请重试！');
+        }
+    }
+};
+
+// 更新设备数量
+window.updateDevice = async (key, newQuantity) => {
+    if (newQuantity < 0) {
+        alert('设备数量不能为负数！');
+        return;
+    }
+
+    try {
+        await database.ref(`devices/${key}`).update({ quantity: newQuantity });
+    } catch (error) {
+        console.error('更新设备数量失败:', error);
+        alert('更新设备数量失败，请重试！');
+    }
+};
+
 // 日期筛选
 dateFilter.addEventListener('change', (e) => {
     loadRecords(e.target.value);
 });
 
-// 初始化加载所有记录
+// 初始化加载所有记录和设备列表
 loadRecords();
+loadDeviceList();
