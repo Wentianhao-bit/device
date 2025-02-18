@@ -153,9 +153,9 @@ function loadDeviceList() {
         deviceListBody.innerHTML = '';
         const devices = snapshot.val() || {};
 
-        // 按类型排序（生产设备 → 检测仪器 → 办公设备）
+        // 按类型排序（拍摄设备 → 灯光仪器 → 其他设备）
         const sortedDevices = Object.entries(devices).sort((a, b) => {
-            const typeOrder = { '生产设备': 1, '检测仪器': 2, '办公设备': 3 };
+            const typeOrder = { '拍摄设备': 1, '灯光仪器': 2, '其他设备': 3 };
             return typeOrder[a[1].type] - typeOrder[b[1].type];
         });
 
