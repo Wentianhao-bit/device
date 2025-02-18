@@ -127,4 +127,129 @@ addDeviceBtn.addEventListener('click', async () => {
     try {
         const snapshot = await database.ref('devices').orderByChild('name').equalTo(deviceData.name).once('value');
         if (snapshot.exists()) {
-            alert('设备已存在！
+            alert('设备已存在！');
+            return;
+        }
+        await database.ref('devices').push(deviceData);
+        document.getElementById('newDeviceName').value = '';
+        document.getElementById('newDeviceQuantity').value = '';
+        alert('设备添加成功！');
+    } catch (error) {
+        console.error('添加失败:', error);
+        alert('添加设备失败，请重试！');
+    }
+});
+
+// 加载设备列表（含出库状态和借用人）
+function loadDeviceList() {
+    database.ref('devices').on('value', (snapshot) => {
+        const deviceListBody = document.getElementById('deviceListBody');
+        deviceListBody.innerHTML = '';
+        const devices = snapshot.val() || {};
+
+        Object.entries(devices).forEach(([key, value]) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${value.name}</td>
+                <td>${value.type}</td>
+                <td>
+                    ${value.quantity}
+                    <button class="btn btn-sm btn-success quantity-btn" onclick="updateDeviceQuantity('${key}', ${value.quantity + 1})">+</button>
+                    <button class="btn btn-sm btn-warning quantity-btn" onclick="updateDeviceQuantity('${key}', ${value.quantity - 1})">-</button>
+                </td>
+                <td>${value.outQuantity || 0}</td>
+                <td>${value.borrower || '无'}</td>
+                <td class="${value.outQuantity > 0 ? 'status-out' : 'status-in'}">
+                    ${value.outQuantity > 0 ? '出库中' : '在库'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteDevice('${key}')">删除</button>
+                </td>
+            `;
+            deviceListBody.appendChild(row);
+        });
+    });
+}
+
+// 更新设备数量
+window.updateDeviceQuantity = async (key, newQuantity) => {
+    if (newQuantity < 0) {
+        alert('设备数量不能为负数！');
+        return;
+    }
+
+    try {
+        await database.ref(`devices/${key}`).update({ quantity: newQuantity });
+        alert('设备数量更新成功！');
+    } catch (error) {
+        console.error('更新失败:', error);
+        alert('更新设备数量失败，请重试！');
+    }
+};
+
+// 删除设备
+window.deleteDevice = async (key) => {
+    if (confirm('确定删除该设备吗？')) {
+        try {
+            await database.ref(`devices/${key}`).remove();
+            alert('设备删除成功！');
+        } catch (error) {
+            console.error('删除失败:', error);
+            alert('删除设备失败，请重试！');
+        }
+    }
+};
+
+// 加载记录（含删除功能）
+function loadRecords(dateFilter = '') {
+    let ref = database.ref('records');
+    
+    if (dateFilter) {
+        const startDate = new Date(dateFilter);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+        ref = ref.orderByChild('timestamp').startAt(startDate.getTime()).endAt(endDate.getTime() - 1);
+    }
+
+    ref.on('value', (snapshot) => {
+        const recordsBody = document.getElementById('recordsBody');
+        recordsBody.innerHTML = '';
+        const records = snapshot.val() || {};
+
+        Object.entries(records).forEach(([key, value]) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${new Date(value.timestamp).toLocaleString()}</td>
+                <td>${value.deviceName}</td>
+                <td>${value.deviceType}</td>
+                <td class="${value.operationType === '入库' ? 'operation-in' : 'operation-out'}">${value.operationType}</td>
+                <td>${value.personName}</td>
+                <td><span class="delete-btn" onclick="deleteRecord('${key}')">🗑️ 删除</span></td>
+            `;
+            recordsBody.appendChild(row);
+        });
+    });
+}
+
+// 删除记录（需密码验证）
+window.deleteRecord = async (key) => {
+    const password = prompt('请输入删除密码：');
+    if (password !== '000000') {
+        alert('密码错误！');
+        return;
+    }
+
+    try {
+        await database.ref(`records/${key}`).remove();
+        alert('记录删除成功！');
+    } catch (error) {
+        console.error('删除失败:', error);
+        alert('删除记录失败，请重试！');
+    }
+};
+
+// 初始化加载
+loadDevicesToSelect();
+loadRecords();
+loadDeviceList();
+document.getElementById('dateFilter').addEventListener('change', (e) => loadRecords(e.target.value));
