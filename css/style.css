@@ -20,3 +20,8 @@ body {
     max-height: 600px;
     overflow-y: auto;
 }
+
+.delete-btn {
+    cursor: pointer;
+    color: #dc3545;
+}
