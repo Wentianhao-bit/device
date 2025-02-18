@@ -19,6 +19,12 @@ const recordForm = document.getElementById('recordForm');
 const deviceSelect = document.getElementById('deviceSelect');
 const deviceType = document.getElementById('deviceType');
 const addDeviceBtn = document.getElementById('addDeviceBtn');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+
+// 分页相关变量
+let currentPage = 1;
+const recordsPerPage = 16;
 
 // 动态加载设备到选择框
 function loadDevicesToSelect() {
@@ -82,7 +88,7 @@ recordForm.addEventListener('submit', async (e) => {
                 const updatedDevice = {
                     ...device[key],
                     outQuantity: (device[key].outQuantity || 0) + 1,
-                    borrower: recordData.personName
+                    borrowers: [...(device[key].borrowers || []), recordData.personName]
                 };
                 await database.ref(`devices/${key}`).update(updatedDevice);
             }
@@ -94,7 +100,7 @@ recordForm.addEventListener('submit', async (e) => {
                 const updatedDevice = {
                     ...device[key],
                     outQuantity: Math.max((device[key].outQuantity || 0) - 1, 0),
-                    borrower: device[key].outQuantity > 1 ? device[key].borrower : ''
+                    borrowers: device[key].outQuantity > 1 ? device[key].borrowers : []
                 };
                 await database.ref(`devices/${key}`).update(updatedDevice);
             }
@@ -116,7 +122,7 @@ addDeviceBtn.addEventListener('click', async () => {
         type: document.getElementById('newDeviceType').value,
         quantity: parseInt(document.getElementById('newDeviceQuantity').value) || 0,
         outQuantity: 0, // 初始出库数量为0
-        borrower: '' // 初始借用人为空
+        borrowers: [] // 初始借用人为空
     };
 
     if (!deviceData.name || deviceData.quantity <= 0) {
@@ -147,7 +153,10 @@ function loadDeviceList() {
         deviceListBody.innerHTML = '';
         const devices = snapshot.val() || {};
 
-        Object.entries(devices).forEach(([key, value]) => {
+        // 按设备类型排序
+        const sortedDevices = Object.entries(devices).sort((a, b) => a[1].type.localeCompare(b[1].type));
+
+        sortedDevices.forEach(([key, value]) => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${value.name}</td>
@@ -158,7 +167,7 @@ function loadDeviceList() {
                     <button class="btn btn-sm btn-warning quantity-btn" onclick="updateDeviceQuantity('${key}', ${value.quantity - 1})">-</button>
                 </td>
                 <td>${value.outQuantity || 0}</td>
-                <td>${value.borrower || '无'}</td>
+                <td>${value.borrowers ? value.borrowers.join(', ') : '无'}</td>
                 <td class="${value.outQuantity > 0 ? 'status-out' : 'status-in'}">
                     ${value.outQuantity > 0 ? '出库中' : '在库'}
                 </td>
@@ -171,8 +180,14 @@ function loadDeviceList() {
     });
 }
 
-// 更新设备数量
+// 更新设备数量（需密码验证）
 window.updateDeviceQuantity = async (key, newQuantity) => {
+    const password = prompt('请输入密码：');
+    if (password !== '000000') {
+        alert('密码错误！');
+        return;
+    }
+
     if (newQuantity < 0) {
         alert('设备数量不能为负数！');
         return;
@@ -187,8 +202,14 @@ window.updateDeviceQuantity = async (key, newQuantity) => {
     }
 };
 
-// 删除设备
+// 删除设备（需密码验证）
 window.deleteDevice = async (key) => {
+    const password = prompt('请输入密码：');
+    if (password !== '000000') {
+        alert('密码错误！');
+        return;
+    }
+
     if (confirm('确定删除该设备吗？')) {
         try {
             await database.ref(`devices/${key}`).remove();
@@ -200,15 +221,15 @@ window.deleteDevice = async (key) => {
     }
 };
 
-// 加载记录（含删除功能）
+// 加载记录（含分页功能）
 function loadRecords(dateFilter = '') {
-    let ref = database.ref('records');
+    let ref = database.ref('records').orderByChild('timestamp');
     
     if (dateFilter) {
         const startDate = new Date(dateFilter);
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
-        ref = ref.orderByChild('timestamp').startAt(startDate.getTime()).endAt(endDate.getTime() - 1);
+        ref = ref.startAt(startDate.getTime()).endAt(endDate.getTime() - 1);
     }
 
     ref.on('value', (snapshot) => {
@@ -216,7 +237,15 @@ function loadRecords(dateFilter = '') {
         recordsBody.innerHTML = '';
         const records = snapshot.val() || {};
 
-        Object.entries(records).forEach(([key, value]) => {
+        // 将记录按时间戳排序
+        const sortedRecords = Object.entries(records).sort((a, b) => b[1].timestamp - a[1].timestamp);
+
+        // 分页逻辑
+        const startIndex = (currentPage - 1) * recordsPerPage;
+        const endIndex = startIndex + recordsPerPage;
+        const paginatedRecords = sortedRecords.slice(startIndex, endIndex);
+
+        paginatedRecords.forEach(([key, value]) => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${new Date(value.timestamp).toLocaleString()}</td>
@@ -228,12 +257,16 @@ function loadRecords(dateFilter = '') {
             `;
             recordsBody.appendChild(row);
         });
+
+        // 更新分页按钮状态
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = endIndex >= sortedRecords.length;
     });
 }
 
 // 删除记录（需密码验证）
 window.deleteRecord = async (key) => {
-    const password = prompt('请输入删除密码：');
+    const password = prompt('请输入密码：');
     if (password !== '000000') {
         alert('密码错误！');
         return;
@@ -248,8 +281,21 @@ window.deleteRecord = async (key) => {
     }
 };
 
+// 翻页功能
+prevPageBtn.addEventListener('click', () => {
+    currentPage--;
+    loadRecords(document.getElementById('dateFilter').value);
+});
+
+nextPageBtn.addEventListener('click', () => {
+    currentPage++;
+    loadRecords(document.getElementById('dateFilter').value);
+});
+
 // 初始化加载
 loadDevicesToSelect();
 loadRecords();
 loadDeviceList();
-document.getElementById('dateFilter').addEventListener('change', (e) => loadRecords(e.target.value));
+document.getElementById('dateFilter').addEventListener('change', (e) => {
+    currentPage = 1;
+    loadRecords(e.target
