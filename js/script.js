@@ -80,27 +80,26 @@ recordForm.addEventListener('submit', async (e) => {
         await database.ref('records').push(recordData);
 
         // 更新设备状态
-        if (recordData.operationType === '出库') {
-            const snapshot = await database.ref('devices').orderByChild('name').equalTo(recordData.deviceName).once('value');
-            const device = snapshot.val();
-            if (device) {
-                const key = Object.keys(device)[0];
+        const snapshot = await database.ref('devices').orderByChild('name').equalTo(recordData.deviceName).once('value');
+        const device = snapshot.val();
+        if (device) {
+            const key = Object.keys(device)[0];
+            const currentDevice = device[key];
+
+            if (recordData.operationType === '出库') {
+                // 出库：增加出库数量，添加借用人
                 const updatedDevice = {
-                    ...device[key],
-                    outQuantity: (device[key].outQuantity || 0) + 1,
-                    borrowers: [...(device[key].borrowers || []), recordData.personName]
+                    ...currentDevice,
+                    outQuantity: (currentDevice.outQuantity || 0) + 1,
+                    borrowers: [...(currentDevice.borrowers || []), recordData.personName]
                 };
                 await database.ref(`devices/${key}`).update(updatedDevice);
-            }
-        } else if (recordData.operationType === '入库') {
-            const snapshot = await database.ref('devices').orderByChild('name').equalTo(recordData.deviceName).once('value');
-            const device = snapshot.val();
-            if (device) {
-                const key = Object.keys(device)[0];
+            } else if (recordData.operationType === '入库') {
+                // 入库：减少出库数量，移除借用人
                 const updatedDevice = {
-                    ...device[key],
-                    outQuantity: Math.max((device[key].outQuantity || 0) - 1, 0),
-                    borrowers: device[key].outQuantity > 1 ? device[key].borrowers : []
+                    ...currentDevice,
+                    outQuantity: Math.max((currentDevice.outQuantity || 0) - 1, 0),
+                    borrowers: [] // 入库后清空借用人
                 };
                 await database.ref(`devices/${key}`).update(updatedDevice);
             }
