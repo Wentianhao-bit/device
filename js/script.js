@@ -11,7 +11,9 @@ const firebaseConfig = {
 };
 
 // 初始化Firebase
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const database = firebase.database();
 
 // DOM元素
@@ -27,21 +29,64 @@ const newDeviceQuantity = document.getElementById('newDeviceQuantity');
 recordForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const deviceName = document.getElementById('deviceName').value.trim();
+    const deviceType = document.getElementById('deviceType').value.trim();
+    const operationType = document.getElementById('operationType').value.trim();
+    const recordTime = document.getElementById('recordTime').value.trim();
+    const personName = document.getElementById('personName').value.trim();
+
+    if (!deviceName || !deviceType || !operationType || !recordTime || !personName) {
+        alert('请填写所有字段！');
+        return;
+    }
+
     const newRecord = {
-        deviceName: document.getElementById('deviceName').value,
-        deviceType: document.getElementById('deviceType').value,
-        operationType: document.getElementById('operationType').value,
-        recordTime: document.getElementById('recordTime').value,
-        personName: document.getElementById('personName').value,
+        deviceName,
+        deviceType,
+        operationType,
+        recordTime,
+        personName,
         timestamp: firebase.database.ServerValue.TIMESTAMP
     };
 
     try {
         await database.ref('records').push(newRecord);
         recordForm.reset();
+        alert('记录提交成功！');
     } catch (error) {
         console.error('提交失败:', error);
         alert('记录提交失败，请重试！');
+    }
+});
+
+// 添加设备
+addDeviceBtn.addEventListener('click', async () => {
+    const deviceName = newDeviceName.value.trim();
+    const quantity = parseInt(newDeviceQuantity.value);
+
+    if (!deviceName || isNaN(quantity) || quantity <= 0) {
+        alert('请填写设备名称和有效数量！');
+        return;
+    }
+
+    try {
+        const snapshot = await database.ref('devices').orderByChild('name').equalTo(deviceName).once('value');
+        const existingDevice = snapshot.val();
+
+        if (existingDevice) {
+            const key = Object.keys(existingDevice)[0];
+            const newQuantity = existingDevice[key].quantity + quantity;
+            await database.ref(`devices/${key}`).update({ quantity: newQuantity });
+        } else {
+            await database.ref('devices').push({ name: deviceName, quantity: quantity });
+        }
+
+        newDeviceName.value = '';
+        newDeviceQuantity.value = '';
+        alert('设备添加成功！');
+    } catch (error) {
+        console.error('添加设备失败:', error);
+        alert('添加设备失败，请重试！');
     }
 });
 
@@ -49,7 +94,7 @@ recordForm.addEventListener('submit', async (e) => {
 function loadRecords(dateFilter = '') {
     let ref = database.ref('records');
     
-    if(dateFilter) {
+    if (dateFilter) {
         const startDate = new Date(dateFilter);
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
@@ -82,36 +127,6 @@ function loadRecords(dateFilter = '') {
     });
 }
 
-// 添加设备
-addDeviceBtn.addEventListener('click', async () => {
-    const deviceName = newDeviceName.value.trim();
-    const quantity = parseInt(newDeviceQuantity.value);
-
-    if (!deviceName || isNaN(quantity) {
-        alert('请填写设备名称和数量！');
-        return;
-    }
-
-    try {
-        const snapshot = await database.ref('devices').orderByChild('name').equalTo(deviceName).once('value');
-        const existingDevice = snapshot.val();
-
-        if (existingDevice) {
-            const key = Object.keys(existingDevice)[0];
-            const newQuantity = existingDevice[key].quantity + quantity;
-            await database.ref(`devices/${key}`).update({ quantity: newQuantity });
-        } else {
-            await database.ref('devices').push({ name: deviceName, quantity: quantity });
-        }
-
-        newDeviceName.value = '';
-        newDeviceQuantity.value = '';
-    } catch (error) {
-        console.error('添加设备失败:', error);
-        alert('添加设备失败，请重试！');
-    }
-});
-
 // 实时加载设备列表
 function loadDeviceList() {
     database.ref('devices').on('value', (snapshot) => {
@@ -141,6 +156,7 @@ window.deleteDevice = async (key) => {
     if (confirm('确定删除该设备吗？')) {
         try {
             await database.ref(`devices/${key}`).remove();
+            alert('设备删除成功！');
         } catch (error) {
             console.error('删除设备失败:', error);
             alert('删除设备失败，请重试！');
@@ -157,6 +173,7 @@ window.updateDevice = async (key, newQuantity) => {
 
     try {
         await database.ref(`devices/${key}`).update({ quantity: newQuantity });
+        alert('设备数量更新成功！');
     } catch (error) {
         console.error('更新设备数量失败:', error);
         alert('更新设备数量失败，请重试！');
