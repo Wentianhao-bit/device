@@ -19,15 +19,12 @@
                 <h5 class="card-title">新增记录</h5>
                 <form id="recordForm" class="row g-3">
                     <div class="col-md-3">
-                        <input type="text" class="form-control" placeholder="设备名称" id="deviceName" required>
+                        <select class="form-select" id="deviceSelect" required>
+                            <option value="">选择设备</option>
+                        </select>
                     </div>
                     <div class="col-md-2">
-                        <select class="form-select" id="deviceType" required>
-                            <option value="">选择类型</option>
-                            <option>拍摄设备</option>
-                            <option>灯光仪器</option>
-                            <option>其他设备</option>
-                        </select>
+                        <input type="text" class="form-control" id="deviceType" placeholder="设备类型" readonly>
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" id="operationType" required>
@@ -70,6 +67,7 @@
                                 <th>类型</th>
                                 <th>操作</th>
                                 <th>借用人/归还人</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="recordsBody">
@@ -84,8 +82,15 @@
             <div class="card-body">
                 <h5 class="card-title mb-4">设备列表</h5>
                 <div class="row align-items-center mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <input type="text" class="form-control" placeholder="设备名称" id="newDeviceName">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" id="newDeviceType">
+                            <option>拍摄设备</option>
+                            <option>灯光仪器</option>
+                            <option>其他设备</option>
+                        </select>
                     </div>
                     <div class="col-md-2">
                         <input type="number" class="form-control" placeholder="数量" id="newDeviceQuantity" min="1">
@@ -99,6 +104,7 @@
                         <thead>
                             <tr>
                                 <th>设备名称</th>
+                                <th>类型</th>
                                 <th>数量</th>
                                 <th>操作</th>
                             </tr>
