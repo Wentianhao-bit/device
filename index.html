@@ -24,9 +24,9 @@
                     <div class="col-md-2">
                         <select class="form-select" id="deviceType" required>
                             <option value="">选择类型</option>
-                            <option>生产设备</option>
-                            <option>检测仪器</option>
-                            <option>办公设备</option>
+                            <option>拍摄设备</option>
+                            <option>灯光仪器</option>
+                            <option>其他设备</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -40,6 +40,9 @@
                         <input type="datetime-local" class="form-control" id="recordTime" required>
                     </div>
                     <div class="col-md-2">
+                        <input type="text" class="form-control" placeholder="借用人/归还人" id="personName" required>
+                    </div>
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">提交记录</button>
                     </div>
                 </form>
@@ -47,7 +50,7 @@
         </div>
 
         <!-- 查询区 -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title mb-4">记录查询</h5>
                 <div class="row align-items-center mb-3">
@@ -66,10 +69,41 @@
                                 <th>设备名称</th>
                                 <th>类型</th>
                                 <th>操作</th>
-                                <th>操作人</th>
+                                <th>借用人/归还人</th>
                             </tr>
                         </thead>
                         <tbody id="recordsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设备列表 -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">设备列表</h5>
+                <div class="row align-items-center mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" placeholder="设备名称" id="newDeviceName">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" placeholder="数量" id="newDeviceQuantity" min="1">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-success w-100" id="addDeviceBtn">添加设备</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>设备名称</th>
+                                <th>数量</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deviceListBody">
                         </tbody>
                     </table>
                 </div>
